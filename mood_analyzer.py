@@ -10,8 +10,10 @@ This class starts with very simple logic:
 """
 
 from typing import List, Dict, Tuple, Optional
+import re
+import unicodedata
 
-from dataset import POSITIVE_WORDS, NEGATIVE_WORDS
+from dataset import POSITIVE_WORDS, NEGATIVE_WORDS, SAMPLE_POSTS, SAMPLE_POSTS
 
 
 class MoodAnalyzer:
@@ -53,9 +55,38 @@ class MoodAnalyzer:
           - Normalize repeated characters ("soooo" -> "soo")
         """
         cleaned = text.strip().lower()
+        
+        # Extract emojis first (preserve them separately)
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags
+            "]+", 
+            flags=re.UNICODE
+        )
+        emojis = emoji_pattern.findall(cleaned)
+        cleaned = emoji_pattern.sub(" ", cleaned)
+        
+        # Remove simple emoji representations like ":)" and ":("
+        cleaned = re.sub(r':[)(\-pPdD]+', ' ', cleaned)
+        
+        # Remove punctuation (except apostrophes to keep contractions intact)
+        cleaned = re.sub(r"[^\w\s']", " ", cleaned)
+        
+        # Normalize repeated characters (e.g., "soooo" -> "soo")
+        cleaned = re.sub(r'(\w)\1{2,}', r'\1\1', cleaned)
+        
+        # Split on whitespace
         tokens = cleaned.split()
-
+        
+        # Add emojis back as separate tokens
+        tokens.extend(emojis)
+        
+        print(tokens)
         return tokens
+
 
     # ---------------------------------------------------------------------
     # Scoring logic
@@ -83,7 +114,7 @@ class MoodAnalyzer:
         #
         # Hint: if you implement negation, you may want to look at pairs of tokens,
         # like ("not", "happy") or ("never", "fun").
-        pass
+        tokens = self.preprocess(text)
 
     # ---------------------------------------------------------------------
     # Label prediction
@@ -151,3 +182,12 @@ class MoodAnalyzer:
             f"(positive: {positive_hits or '[]'}, "
             f"negative: {negative_hits or '[]'})"
         )
+
+
+if __name__ == "__main__":
+    analyzer = MoodAnalyzer()
+
+    for post in SAMPLE_POSTS:
+        tokens = analyzer.preprocess(post)
+        print(f"Post: {post}")
+        print(f"Tokens: {tokens}\n")
